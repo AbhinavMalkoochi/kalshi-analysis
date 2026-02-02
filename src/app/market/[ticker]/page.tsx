@@ -24,6 +24,14 @@ export default async function MarketPage({
   const ticker = resolvedParams.ticker.toUpperCase();
   const market = await getMarket(ticker);
   const orderbook = await getOrderbook(ticker);
+  const secondaryTitle =
+    market.event_title &&
+    market.event_title !== market.display_title &&
+    market.event_title !== "Combo"
+      ? market.event_title
+      : market.series_title && market.series_title !== market.display_title
+        ? market.series_title
+        : null;
 
   const { start, end } = getRecentCandlestickWindow(30);
   const candlesticks = market.series_ticker
@@ -53,6 +61,9 @@ export default async function MarketPage({
           <h1 className="text-2xl font-semibold text-white sm:text-3xl">
             {market.display_title}
           </h1>
+          {secondaryTitle ? (
+            <p className="text-sm text-muted-foreground">{secondaryTitle}</p>
+          ) : null}
           <p className="text-sm text-muted-foreground">Ticker: {market.ticker}</p>
         </section>
 

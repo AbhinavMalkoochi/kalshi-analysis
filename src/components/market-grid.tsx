@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { Market } from "@/lib/kalshi";
 
-function formatPrice(value?: number) {
+function formatPrice(value?: number | null) {
   if (value === undefined || value === null) return "--";
   return `${value}¢`;
 }
@@ -29,11 +29,19 @@ export default function MarketGrid({ markets }: { markets: Market[] }) {
               <CardTitle className="line-clamp-2 text-base font-semibold text-foreground">
                 {market.display_title}
               </CardTitle>
+              {market.display_detail ? (
+                <p className="text-xs text-muted-foreground">
+                  {market.display_detail}
+                </p>
+              ) : null}
             </CardHeader>
             <CardContent className="flex items-center justify-between text-sm">
               <div className="flex flex-col">
                 <span className="text-xs text-muted-foreground">Yes</span>
                 <span className="font-mono text-lg text-emerald-300">{formatPrice(market.yes_price)}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  Bid {formatPrice(market.yes_bid)} · Ask {formatPrice(market.yes_ask)}
+                </span>
               </div>
               <div className="flex flex-col text-right">
                 <span className="text-xs text-muted-foreground">24h Volume</span>
