@@ -9,15 +9,21 @@ type Candlestick = { ts: number; close: number | null };
 export default function MarketAnalytics({
   marketTicker,
   candlesticks,
+  currentPrice,
 }: {
   marketTicker: string;
   candlesticks: Candlestick[];
+  currentPrice?: number;
 }) {
   const [report, setReport] = useState<AnalysisReport | null>(null);
 
   return (
     <div className="space-y-4">
-      <MarketChart candlesticks={candlesticks} annotations={report?.annotations} />
+      <MarketChart 
+        candlesticks={candlesticks} 
+        annotations={report?.annotations} 
+        currentPrice={currentPrice}
+      />
       <AnalysisPanel marketTicker={marketTicker} onReport={setReport} />
     </div>
   );

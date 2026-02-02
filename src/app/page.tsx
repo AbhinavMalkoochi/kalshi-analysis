@@ -1,7 +1,7 @@
 import SiteHeader from "@/components/site-header";
 import MarketSearch from "@/components/market-search";
-import MarketGrid from "@/components/market-grid";
-import { getMarkets } from "@/lib/kalshi";
+import EventGrid from "@/components/event-grid";
+import { getGroupedMarkets } from "@/lib/kalshi";
 import Link from "next/link";
 
 export default async function Home({
@@ -10,9 +10,9 @@ export default async function Home({
   searchParams: Promise<{ cursor?: string }>;
 }) {
   const resolvedSearchParams = await searchParams;
-  const { markets, cursor } = await getMarkets({
+  const { events, cursor } = await getGroupedMarkets({
     cursor: resolvedSearchParams?.cursor,
-    limit: 24,
+    limit: 100, // Fetch more to ensure good grouping
   });
 
   return (
@@ -27,7 +27,7 @@ export default async function Home({
             Discover live Kalshi markets in a Bloomberg-inspired terminal.
           </h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Paste a market URL for instant access or browse live markets. AI analysis is on-demand to
+            Paste a market URL for instant access or browse live events. AI analysis is on-demand to
             protect your token budget.
           </p>
           <MarketSearch />
@@ -35,10 +35,10 @@ export default async function Home({
 
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-emerald-200">Live Markets</h2>
-            <span className="text-xs text-muted-foreground">Showing {markets.length} markets</span>
+            <h2 className="text-lg font-semibold text-emerald-200">Live Events</h2>
+            <span className="text-xs text-muted-foreground">Showing {events.length} events</span>
           </div>
-          <MarketGrid markets={markets} />
+          <EventGrid events={events} />
           <div className="flex justify-end">
             {cursor ? (
               <Link

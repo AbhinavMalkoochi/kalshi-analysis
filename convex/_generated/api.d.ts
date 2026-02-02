@@ -8,13 +8,29 @@
  * @module
  */
 
+import type * as analysis from "../analysis.js";
+import type * as chat from "../chat.js";
+import type * as lib_auth from "../lib/auth.js";
+import type * as lib_kalshi from "../lib/kalshi.js";
+import type * as lib_llm from "../lib/llm.js";
+import type * as lib_search from "../lib/search.js";
+import type * as settings from "../settings.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-declare const fullApi: ApiFromModules<{}>;
+declare const fullApi: ApiFromModules<{
+  analysis: typeof analysis;
+  chat: typeof chat;
+  "lib/auth": typeof lib_auth;
+  "lib/kalshi": typeof lib_kalshi;
+  "lib/llm": typeof lib_llm;
+  "lib/search": typeof lib_search;
+  settings: typeof settings;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
