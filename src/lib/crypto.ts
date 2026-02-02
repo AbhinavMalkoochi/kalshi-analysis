@@ -3,8 +3,9 @@
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-function toBase64(buffer: ArrayBuffer) {
-  return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+function toBase64(buffer: ArrayBuffer | Uint8Array) {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  return btoa(String.fromCharCode(...bytes));
 }
 
 function fromBase64(input: string) {
@@ -28,7 +29,7 @@ async function deriveKey(password: string, salt: Uint8Array) {
   return await crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt,
+      salt: salt as BufferSource,
       iterations: 100_000,
       hash: "SHA-256",
     },

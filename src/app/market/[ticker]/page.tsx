@@ -65,9 +65,9 @@ export default async function MarketPage({
 
         <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">
           <MarketRules
-            rulesPrimary={market.rules_primary}
-            rulesSecondary={market.rules_secondary}
-            resolution={market.resolution}
+            rulesPrimary={market.rules_primary ?? undefined}
+            rulesSecondary={market.rules_secondary ?? undefined}
+            resolution={market.resolution ?? undefined}
           />
           <OrderbookCard orderbook={orderbook} />
         </section>

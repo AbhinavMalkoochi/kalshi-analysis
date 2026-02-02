@@ -60,7 +60,15 @@ export default function MarketChart({
               color: "#e5e7eb",
               fontSize: 12,
             }}
-            formatter={(value: number) => [`${value}¢`, "Close"]}
+            formatter={(value) => {
+              const formatted =
+                typeof value === "number"
+                  ? `${value}¢`
+                  : value !== undefined && value !== null
+                    ? `${value}¢`
+                    : "--";
+              return [formatted, "Close"];
+            }}
             labelFormatter={(label) => formatTime(label as number)}
           />
           <Line
