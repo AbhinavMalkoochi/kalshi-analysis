@@ -6,10 +6,10 @@ import { api } from "../../convex/_generated/api";
 import { loadGuestSettings, saveGuestSettings } from "@/lib/guest-storage";
 import type { Provider } from "@/lib/models";
 
-export type EncryptedKey = { ciphertext: string; iv: string; salt: string };
+export type StoredKey = string;
 
 export type SettingsPayload = {
-  encryptedKeys: Record<string, EncryptedKey>;
+  encryptedKeys: Record<string, StoredKey>;
   preferences: {
     defaultProvider?: Provider | string;
     defaultModel?: string;

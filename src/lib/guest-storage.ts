@@ -3,7 +3,7 @@
 const STORAGE_KEY = "kalshi-guest-settings";
 
 export type GuestSettings = {
-  encryptedKeys: Record<string, { ciphertext: string; iv: string; salt: string }>;
+  encryptedKeys: Record<string, string>;
   preferences: {
     defaultProvider?: string;
     defaultModel?: string;
