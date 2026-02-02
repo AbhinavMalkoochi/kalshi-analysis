@@ -1,18 +1,48 @@
 const KALSHI_BASE_URL = "https://api.elections.kalshi.com/trade-api/v2";
 
+type KalshiMarketRaw = {
+  ticker: string;
+  title: string;
+  subtitle?: string | null;
+  yes_bid?: number | null;
+  yes_ask?: number | null;
+  no_bid?: number | null;
+  no_ask?: number | null;
+  last_price?: number | null;
+  volume?: number | null;
+  volume_24h?: number | null;
+  open_interest?: number | null;
+  close_time?: string | null;
+  category?: string | null;
+  event_ticker?: string | null;
+  series_ticker?: string | null;
+  rules_primary?: string | null;
+  rules_secondary?: string | null;
+  settlement_value?: string | number | null;
+  resolution?: string | null;
+};
+
 export type Market = {
   ticker: string;
   title: string;
+  display_title: string;
+  subtitle?: string | null;
   yes_price?: number;
   no_price?: number;
+  yes_bid?: number | null;
+  yes_ask?: number | null;
+  no_bid?: number | null;
+  no_ask?: number | null;
+  last_price?: number | null;
   volume?: number;
-  open_interest?: number;
-  close_time?: string;
-  category?: string;
-  event_ticker?: string;
-  series_ticker?: string;
-  rules_primary?: string;
-  rules_secondary?: string;
+  volume_24h?: number | null;
+  open_interest?: number | null;
+  close_time?: string | null;
+  category?: string | null;
+  event_ticker?: string | null;
+  series_ticker?: string | null;
+  rules_primary?: string | null;
+  rules_secondary?: string | null;
   settlement_value?: string | number | null;
   resolution?: string | null;
 };
@@ -56,6 +86,42 @@ async function kalshiFetch<T>(path: string, params?: Record<string, string>) {
   return (await response.json()) as T;
 }
 
+function pickPrice(...values: Array<number | null | undefined>) {
+  return values.find((value) => value !== undefined && value !== null);
+}
+
+function normalizeMarket(raw: KalshiMarketRaw): Market {
+  const yesPrice = pickPrice(raw.yes_bid, raw.yes_ask, raw.last_price);
+  const noPrice = pickPrice(raw.no_bid, raw.no_ask);
+  const displayTitle = raw.subtitle?.trim() ? raw.subtitle : raw.title;
+  const volume = raw.volume_24h ?? raw.volume ?? undefined;
+
+  return {
+    ticker: raw.ticker,
+    title: raw.title,
+    subtitle: raw.subtitle ?? null,
+    display_title: displayTitle,
+    yes_price: yesPrice ?? undefined,
+    no_price: noPrice ?? undefined,
+    yes_bid: raw.yes_bid ?? null,
+    yes_ask: raw.yes_ask ?? null,
+    no_bid: raw.no_bid ?? null,
+    no_ask: raw.no_ask ?? null,
+    last_price: raw.last_price ?? null,
+    volume,
+    volume_24h: raw.volume_24h ?? null,
+    open_interest: raw.open_interest ?? null,
+    close_time: raw.close_time ?? null,
+    category: raw.category ?? null,
+    event_ticker: raw.event_ticker ?? null,
+    series_ticker: raw.series_ticker ?? null,
+    rules_primary: raw.rules_primary ?? null,
+    rules_secondary: raw.rules_secondary ?? null,
+    settlement_value: raw.settlement_value ?? null,
+    resolution: raw.resolution ?? null,
+  };
+}
+
 export async function getMarkets({
   cursor,
   status = "open",
@@ -65,7 +131,7 @@ export async function getMarkets({
   status?: string;
   limit?: number;
 }) {
-  const data = await kalshiFetch<{ markets: Market[]; cursor: string }>(
+  const data = await kalshiFetch<{ markets: KalshiMarketRaw[]; cursor: string }>(
     "/markets",
     {
       status,
@@ -74,19 +140,31 @@ export async function getMarkets({
     },
   );
 
-  return data;
+  return {
+    cursor: data.cursor,
+    markets: data.markets.map(normalizeMarket),
+  };
 }
 
 export async function getMarket(ticker: string) {
-  const data = await kalshiFetch<{ market: Market }>(`/markets/${ticker}`);
-  return data.market;
+  const data = await kalshiFetch<{ market: KalshiMarketRaw }>(
+    `/markets/${ticker}`,
+  );
+  return normalizeMarket(data.market);
 }
 
 export async function getOrderbook(ticker: string) {
-  const data = await kalshiFetch<{ orderbook: Orderbook }>(
-    `/markets/${ticker}/orderbook`,
-  );
-  return data.orderbook;
+  const data = await kalshiFetch<{
+    orderbook: {
+      yes: OrderbookSide | null;
+      no: OrderbookSide | null;
+    };
+  }>(`/markets/${ticker}/orderbook`);
+
+  return {
+    yes: data.orderbook.yes ?? [],
+    no: data.orderbook.no ?? [],
+  };
 }
 
 export async function getMarketCandlesticks(params: {

@@ -4,6 +4,7 @@ import MarketAnalytics from "@/components/market/market-analytics";
 import OrderbookCard from "@/components/market/orderbook";
 import MarketRules from "@/components/market/market-rules";
 import ChatPanel from "@/components/market/chat-panel";
+import { notFound } from "next/navigation";
 import {
   getMarket,
   getMarketCandlesticks,
@@ -14,9 +15,13 @@ import {
 export default async function MarketPage({
   params,
 }: {
-  params: { ticker: string };
+  params: Promise<{ ticker: string }>;
 }) {
-  const ticker = params.ticker.toUpperCase();
+  const resolvedParams = await params;
+  if (!resolvedParams?.ticker) {
+    notFound();
+  }
+  const ticker = resolvedParams.ticker.toUpperCase();
   const market = await getMarket(ticker);
   const orderbook = await getOrderbook(ticker);
 
@@ -46,7 +51,7 @@ export default async function MarketPage({
             Market View
           </p>
           <h1 className="text-2xl font-semibold text-white sm:text-3xl">
-            {market.title}
+            {market.display_title}
           </h1>
           <p className="text-sm text-muted-foreground">Ticker: {market.ticker}</p>
         </section>

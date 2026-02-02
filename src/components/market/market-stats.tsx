@@ -16,7 +16,7 @@ export default function MarketStats({ market }: { market: Market }) {
       <CardContent className="grid gap-6 py-6 sm:grid-cols-4">
         <Stat label="Yes" value={market.yes_price !== undefined ? `${market.yes_price}¢` : "--"} />
         <Stat label="No" value={market.no_price !== undefined ? `${market.no_price}¢` : "--"} />
-        <Stat label="Volume" value={market.volume ?? "--"} />
+        <Stat label="24h Volume" value={market.volume ?? "--"} />
         <Stat label="Open Interest" value={market.open_interest ?? "--"} />
       </CardContent>
     </Card>

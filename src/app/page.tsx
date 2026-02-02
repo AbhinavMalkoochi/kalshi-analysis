@@ -7,10 +7,11 @@ import Link from "next/link";
 export default async function Home({
   searchParams,
 }: {
-  searchParams?: { cursor?: string };
+  searchParams: Promise<{ cursor?: string }>;
 }) {
+  const resolvedSearchParams = await searchParams;
   const { markets, cursor } = await getMarkets({
-    cursor: searchParams?.cursor,
+    cursor: resolvedSearchParams?.cursor,
     limit: 24,
   });
 

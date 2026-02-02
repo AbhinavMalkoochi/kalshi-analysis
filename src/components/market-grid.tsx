@@ -13,16 +13,21 @@ export default function MarketGrid({ markets }: { markets: Market[] }) {
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {markets.map((market) => (
         <Link key={market.ticker} href={`/market/${market.ticker}`}>
-          <Card className="h-full border-border/60 bg-black/40 transition hover:border-emerald-400/60 hover:shadow-[0_0_20px_rgba(16,185,129,0.25)]">
+          <Card className="h-full border-emerald-500/20 bg-neutral-950/80 shadow-[0_0_20px_rgba(0,0,0,0.35)] transition hover:-translate-y-0.5 hover:border-emerald-400/60 hover:shadow-[0_0_30px_rgba(16,185,129,0.25)]">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <Badge variant="outline" className="border-emerald-500/40 text-emerald-200">
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <Badge
+                  variant="outline"
+                  className="max-w-[70%] truncate border-emerald-500/40 text-emerald-200"
+                >
                   {market.ticker}
                 </Badge>
-                <span className="text-xs text-muted-foreground">{market.category ?? "Market"}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {market.category ?? "Market"}
+                </span>
               </div>
-              <CardTitle className="text-base font-semibold text-foreground">
-                {market.title}
+              <CardTitle className="line-clamp-2 text-base font-semibold text-foreground">
+                {market.display_title}
               </CardTitle>
             </CardHeader>
             <CardContent className="flex items-center justify-between text-sm">
@@ -31,7 +36,7 @@ export default function MarketGrid({ markets }: { markets: Market[] }) {
                 <span className="font-mono text-lg text-emerald-300">{formatPrice(market.yes_price)}</span>
               </div>
               <div className="flex flex-col text-right">
-                <span className="text-xs text-muted-foreground">Volume</span>
+                <span className="text-xs text-muted-foreground">24h Volume</span>
                 <span className="font-mono text-base text-foreground">{market.volume ?? "--"}</span>
               </div>
             </CardContent>

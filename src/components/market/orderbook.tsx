@@ -6,12 +6,16 @@ function renderSide(title: string, side: Array<[number, number]>) {
     <div className="space-y-2">
       <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{title}</div>
       <div className="space-y-1 text-sm">
-        {side.slice(0, 5).map(([price, quantity]) => (
-          <div key={`${title}-${price}-${quantity}`} className="flex justify-between font-mono">
-            <span>{price}¢</span>
-            <span className="text-muted-foreground">{quantity}</span>
-          </div>
-        ))}
+        {side.length === 0 ? (
+          <div className="text-xs text-muted-foreground">No orders</div>
+        ) : (
+          side.slice(0, 5).map(([price, quantity]) => (
+            <div key={`${title}-${price}-${quantity}`} className="flex justify-between font-mono">
+              <span>{price}¢</span>
+              <span className="text-muted-foreground">{quantity}</span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
