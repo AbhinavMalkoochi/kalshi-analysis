@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import type { GroupedEvent, MarketOutcome } from "@/lib/kalshi";
 
 // Format price in cents
-function formatPrice(value: number) {
+function formatPrice(value: number | null | undefined) {
+  if (value === null || value === undefined) return "—";
   return `${Math.round(value)}¢`;
 }
 
@@ -21,9 +22,10 @@ function formatVolume(value: number | null) {
 // Single outcome row - matches Kalshi's style
 // For multi-outcome events, shows the probability this specific outcome wins
 function OutcomeRow({ outcome, showPercentage = true }: { outcome: MarketOutcome; showPercentage?: boolean }) {
-  // Normalized probability - yes_price represents cost to buy YES (implied probability)
-  // In multi-outcome events, this is the chance this specific outcome wins
-  const displayProbability = Math.round(outcome.yes_price);
+  const displayProbability = outcome.chance !== null ? `${outcome.chance}%` : "—";
+  const yesAsk = outcome.quote.yes_ask;
+  const noAsk = outcome.quote.no_ask;
+  const hasWideSpread = outcome.quote.has_wide_spread;
   
   return (
     <div className="flex items-center justify-between gap-2 rounded-lg border border-border/20 bg-black/20 px-3 py-2">
@@ -38,12 +40,12 @@ function OutcomeRow({ outcome, showPercentage = true }: { outcome: MarketOutcome
         
         {showPercentage && (
           <span className="font-mono text-lg font-semibold text-white">
-            {displayProbability}%
+            {displayProbability}
           </span>
         )}
         
         {/* Illiquid indicator */}
-        {outcome.is_illiquid && (
+        {hasWideSpread && (
           <span className="shrink-0 rounded bg-yellow-500/20 px-1.5 py-0.5 text-[10px] text-yellow-400">
             Low Vol
           </span>
@@ -53,26 +55,44 @@ function OutcomeRow({ outcome, showPercentage = true }: { outcome: MarketOutcome
       {/* Buy buttons - Kalshi style */}
       <div className="flex items-center gap-2 shrink-0">
         {/* Yes button */}
-        <Link
-          href={`/market/${outcome.ticker}`}
-          className="flex items-center gap-1.5 rounded bg-emerald-600/90 px-3 py-1.5 transition hover:bg-emerald-600"
-        >
-          <span className="text-xs font-medium text-emerald-100">Yes</span>
-          <span className="font-mono text-sm font-semibold text-white">
-            {formatPrice(outcome.yes_price)}
+        {yesAsk === null ? (
+          <span className="flex items-center gap-1.5 rounded bg-emerald-600/30 px-3 py-1.5 text-emerald-100/60">
+            <span className="text-xs font-medium">Yes</span>
+            <span className="font-mono text-sm font-semibold">
+              {formatPrice(yesAsk)}
+            </span>
           </span>
-        </Link>
+        ) : (
+          <Link
+            href={`/market/${outcome.ticker}`}
+            className="flex items-center gap-1.5 rounded bg-emerald-600/90 px-3 py-1.5 transition hover:bg-emerald-600"
+          >
+            <span className="text-xs font-medium text-emerald-100">Yes</span>
+            <span className="font-mono text-sm font-semibold text-white">
+              {formatPrice(yesAsk)}
+            </span>
+          </Link>
+        )}
         
         {/* No button */}
-        <Link
-          href={`/market/${outcome.ticker}`}
-          className="flex items-center gap-1.5 rounded bg-rose-600/90 px-3 py-1.5 transition hover:bg-rose-600"
-        >
-          <span className="text-xs font-medium text-rose-100">No</span>
-          <span className="font-mono text-sm font-semibold text-white">
-            {formatPrice(outcome.no_price)}
+        {noAsk === null ? (
+          <span className="flex items-center gap-1.5 rounded bg-rose-600/30 px-3 py-1.5 text-rose-100/60">
+            <span className="text-xs font-medium">No</span>
+            <span className="font-mono text-sm font-semibold">
+              {formatPrice(noAsk)}
+            </span>
           </span>
-        </Link>
+        ) : (
+          <Link
+            href={`/market/${outcome.ticker}`}
+            className="flex items-center gap-1.5 rounded bg-rose-600/90 px-3 py-1.5 transition hover:bg-rose-600"
+          >
+            <span className="text-xs font-medium text-rose-100">No</span>
+            <span className="font-mono text-sm font-semibold text-white">
+              {formatPrice(noAsk)}
+            </span>
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -81,49 +101,42 @@ function OutcomeRow({ outcome, showPercentage = true }: { outcome: MarketOutcome
 // Binary market display (single Yes/No market)
 // In Kalshi: yes_price + no_price should roughly equal 100¢ (the difference is spread)
 function BinaryMarket({ outcome }: { outcome: MarketOutcome }) {
-  // Calculate normalized probabilities (in case yes + no > 100 due to spread)
-  const total = outcome.yes_price + outcome.no_price;
-  const normalizedYes = total > 0 ? Math.round((outcome.yes_price / total) * 100) : outcome.probability;
-  const normalizedNo = total > 0 ? Math.round((outcome.no_price / total) * 100) : 100 - outcome.probability;
+  const yesAsk = outcome.quote.yes_ask;
+  const noAsk = outcome.quote.no_ask;
+  const displayProbability = outcome.chance !== null ? `${outcome.chance}%` : "—";
   
   return (
     <Link
       href={`/market/${outcome.ticker}`}
       className="block"
     >
-      <div className="flex items-center justify-center gap-8 py-4">
-        {/* Yes side */}
-        <div className="flex flex-col items-center">
-          <span className="mb-1 rounded bg-emerald-600/90 px-4 py-2 transition hover:bg-emerald-600">
+      <div className="flex items-center justify-between gap-6 py-4">
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-2xl font-bold text-white">{displayProbability}</span>
+          {outcome.quote.has_wide_spread && (
+            <span className="rounded bg-yellow-500/20 px-2 py-0.5 text-[10px] text-yellow-400">
+              Wide spread
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="rounded bg-emerald-600/90 px-4 py-2 transition hover:bg-emerald-600">
             <span className="text-xs font-medium text-emerald-100">Yes </span>
             <span className="font-mono text-lg font-bold text-white">
-              {formatPrice(outcome.yes_price)}
+              {formatPrice(yesAsk)}
             </span>
           </span>
-          <span className="mt-2 font-mono text-2xl font-bold text-emerald-300">
-            {normalizedYes}%
-          </span>
-        </div>
-        
-        {/* Divider */}
-        <div className="h-16 w-px bg-border/40" />
-        
-        {/* No side */}
-        <div className="flex flex-col items-center">
-          <span className="mb-1 rounded bg-rose-600/90 px-4 py-2 transition hover:bg-rose-600">
+          <span className="rounded bg-rose-600/90 px-4 py-2 transition hover:bg-rose-600">
             <span className="text-xs font-medium text-rose-100">No </span>
             <span className="font-mono text-lg font-bold text-white">
-              {formatPrice(outcome.no_price)}
+              {formatPrice(noAsk)}
             </span>
-          </span>
-          <span className="mt-2 font-mono text-2xl font-bold text-rose-400">
-            {normalizedNo}%
           </span>
         </div>
       </div>
       
       {/* Illiquid warning */}
-      {outcome.is_illiquid && (
+      {outcome.quote.has_wide_spread && (
         <div className="mt-2 rounded bg-yellow-500/10 px-2 py-1 text-center text-xs text-yellow-400">
           Wide spread - Low liquidity
         </div>

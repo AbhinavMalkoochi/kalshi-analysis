@@ -23,6 +23,13 @@ type KalshiMarketRaw = {
   no_bid?: number | null;
   no_ask?: number | null;
   last_price?: number | null;
+  yes_bid_size?: number | null;
+  yes_ask_size?: number | null;
+  no_bid_size?: number | null;
+  no_ask_size?: number | null;
+  yes_price?: number | null;
+  market_price?: number | null;
+  mark_price?: number | null;
   previous_yes_bid?: number | null;
   previous_yes_ask?: number | null;
   previous_price?: number | null;
@@ -71,6 +78,24 @@ type KalshiSeriesRaw = {
   frequency?: string | null;
 };
 
+export type Quote = {
+  yes_bid: number | null;
+  yes_ask: number | null;
+  no_bid: number | null;
+  no_ask: number | null;
+  yes_bid_size: number | null;
+  yes_ask_size: number | null;
+  no_bid_size: number | null;
+  no_ask_size: number | null;
+  last_trade_price: number | null;
+  mark_price: number | null;
+  mid_price: number | null;
+  chance: number | null;
+  spread: number | null;
+  has_wide_spread: boolean;
+  has_missing_liquidity: boolean;
+};
+
 // Normalized market for the frontend
 export type Market = {
   ticker: string;
@@ -83,14 +108,20 @@ export type Market = {
   event_title?: string | null;
   series_title?: string | null;
   is_combo?: boolean;
-  // Pricing
-  yes_price?: number;
-  no_price?: number;
   yes_bid?: number | null;
   yes_ask?: number | null;
   no_bid?: number | null;
   no_ask?: number | null;
   last_price?: number | null;
+  yes_bid_size?: number | null;
+  yes_ask_size?: number | null;
+  no_bid_size?: number | null;
+  no_ask_size?: number | null;
+  mark_price?: number | null;
+  market_price?: number | null;
+  yes_price?: number | null;
+  tick_size?: number | null;
+  quote: Quote;
   // Volume and interest
   volume?: number;
   volume_24h?: number | null;
@@ -154,8 +185,50 @@ async function kalshiFetch<T>(path: string, params?: Record<string, string>) {
   return (await response.json()) as T;
 }
 
-function pickPrice(...values: Array<number | null | undefined>) {
-  return values.find((value) => value !== undefined && value !== null);
+export function buildQuote(data: {
+  yes_bid?: number | null;
+  yes_ask?: number | null;
+  no_bid?: number | null;
+  no_ask?: number | null;
+  yes_bid_size?: number | null;
+  yes_ask_size?: number | null;
+  no_bid_size?: number | null;
+  no_ask_size?: number | null;
+  mark_price?: number | null;
+  market_price?: number | null;
+  yes_price?: number | null;
+  last_trade_price?: number | null;
+}): Quote {
+  const yesBid = data.yes_bid ?? null;
+  const yesAsk = data.yes_ask ?? null;
+  const noBid = data.no_bid ?? null;
+  const noAsk = data.no_ask ?? null;
+  const markFromApi = data.mark_price ?? data.market_price ?? data.yes_price ?? null;
+  const midPrice = yesBid !== null && yesAsk !== null ? (yesBid + yesAsk) / 2 : null;
+  const lastTrade = data.last_trade_price ?? null;
+  const markPrice = markFromApi ?? midPrice ?? lastTrade ?? null;
+  const spread = yesBid !== null && yesAsk !== null ? yesAsk - yesBid : null;
+  const hasMissingLiquidity = yesBid === null || yesAsk === null;
+  const hasWideSpread = hasMissingLiquidity || (spread !== null && spread >= 20);
+  const chance = markPrice !== null ? Math.round(markPrice) : null;
+
+  return {
+    yes_bid: yesBid,
+    yes_ask: yesAsk,
+    no_bid: noBid,
+    no_ask: noAsk,
+    yes_bid_size: data.yes_bid_size ?? null,
+    yes_ask_size: data.yes_ask_size ?? null,
+    no_bid_size: data.no_bid_size ?? null,
+    no_ask_size: data.no_ask_size ?? null,
+    last_trade_price: lastTrade,
+    mark_price: markPrice,
+    mid_price: midPrice,
+    chance,
+    spread,
+    has_wide_spread: hasWideSpread,
+    has_missing_liquidity: hasMissingLiquidity,
+  };
 }
 
 // Check if a market is a combo/multi-leg market
@@ -173,8 +246,6 @@ function normalizeMarket(
   raw: KalshiMarketRaw,
   meta?: { eventTitle?: string; seriesTitle?: string },
 ): Market {
-  const yesPrice = pickPrice(raw.yes_bid, raw.yes_ask, raw.last_price);
-  const noPrice = pickPrice(raw.no_bid, raw.no_ask);
   const title = raw.title?.trim() ?? "";
   const subtitle = raw.subtitle?.trim() ?? "";
   const yesSubTitle = raw.yes_sub_title?.trim() ?? "";
@@ -209,6 +280,22 @@ function normalizeMarket(
   
   const volume = raw.volume_24h ?? raw.volume ?? undefined;
 
+  const markPrice = raw.mark_price ?? raw.market_price ?? raw.yes_price ?? null;
+  const quote = buildQuote({
+    yes_bid: raw.yes_bid ?? null,
+    yes_ask: raw.yes_ask ?? null,
+    no_bid: raw.no_bid ?? null,
+    no_ask: raw.no_ask ?? null,
+    yes_bid_size: raw.yes_bid_size ?? null,
+    yes_ask_size: raw.yes_ask_size ?? null,
+    no_bid_size: raw.no_bid_size ?? null,
+    no_ask_size: raw.no_ask_size ?? null,
+    mark_price: raw.mark_price ?? null,
+    market_price: raw.market_price ?? null,
+    yes_price: raw.yes_price ?? null,
+    last_trade_price: raw.last_price ?? null,
+  });
+
   return {
     ticker: raw.ticker,
     title: raw.title,
@@ -220,13 +307,20 @@ function normalizeMarket(
     event_title: eventTitle,
     series_title: seriesTitle,
     is_combo: isCombo,
-    yes_price: yesPrice ?? undefined,
-    no_price: noPrice ?? undefined,
     yes_bid: raw.yes_bid ?? null,
     yes_ask: raw.yes_ask ?? null,
     no_bid: raw.no_bid ?? null,
     no_ask: raw.no_ask ?? null,
     last_price: raw.last_price ?? null,
+    yes_bid_size: raw.yes_bid_size ?? null,
+    yes_ask_size: raw.yes_ask_size ?? null,
+    no_bid_size: raw.no_bid_size ?? null,
+    no_ask_size: raw.no_ask_size ?? null,
+    mark_price: markPrice,
+    market_price: raw.market_price ?? null,
+    yes_price: raw.yes_price ?? null,
+    tick_size: raw.tick_size ?? null,
+    quote,
     volume,
     volume_24h: raw.volume_24h ?? null,
     open_interest: raw.open_interest ?? null,
@@ -519,20 +613,11 @@ export function getRecentCandlestickWindow(days = 30) {
 export type MarketOutcome = {
   ticker: string;
   name: string; // The outcome name (e.g., "Jakub Kaczmarek", "Trump", etc.)
-  // Pricing - yes_ask is the cost to buy YES (also the implied probability)
-  probability: number; // Derived from yes_ask (0-100)
-  yes_price: number; // yes_ask in cents (cost to buy YES)
-  no_price: number; // no_ask or 100 - yes_price (cost to buy NO)
-  yes_bid: number | null;
-  yes_ask: number | null;
-  no_bid: number | null;
-  no_ask: number | null;
-  // Volume
+  chance: number | null;
+  quote: Quote;
   volume_24h: number | null;
   open_interest: number | null;
   liquidity: number | null;
-  // Status
-  is_illiquid: boolean; // true if yes_bid is 0 or spread is too wide
 };
 
 // A grouped event containing all its outcomes
@@ -574,64 +659,16 @@ function extractOutcomeName(market: Market): string {
 }
 
 // Calculate probability from pricing data
-function calculateProbability(market: Market): number {
-  // Best estimate is yes_ask (the price to buy YES)
-  // If not available, fall back to yes_bid, then last_price
-  const price = market.yes_ask ?? market.yes_bid ?? market.last_price ?? 0;
-  return Math.min(100, Math.max(0, price));
-}
-
-// Check if a market is illiquid (wide spread or no buyers)
-function isMarketIlliquid(market: Market): boolean {
-  // If yes_bid is 0 or null, there are no buyers -> illiquid
-  if (!market.yes_bid || market.yes_bid === 0) {
-    return true;
-  }
-  
-  // If spread is > 20 cents, consider it illiquid
-  const yesBid = market.yes_bid ?? 0;
-  const yesAsk = market.yes_ask ?? 100;
-  const spread = yesAsk - yesBid;
-  
-  return spread > 20;
-}
-
 // Convert a raw Market to a MarketOutcome
 function marketToOutcome(market: Market): MarketOutcome {
-  const probability = calculateProbability(market);
-  
-  // Use actual ask prices from API
-  // yes_ask = cost to buy YES (this is what Kalshi displays)
-  // no_ask = cost to buy NO
-  // If no_ask isn't available, calculate from yes_bid (100 - yes_bid)
-  const yesPrice = market.yes_ask ?? market.yes_bid ?? market.last_price ?? 0;
-  
-  // For NO price: use no_ask if available, otherwise calculate from yes_bid
-  // This matches Kalshi's UI where No 48¢ = 100 - yes_bid(52)
-  let noPrice: number;
-  if (market.no_ask !== null && market.no_ask !== undefined) {
-    noPrice = market.no_ask;
-  } else if (market.yes_bid !== null && market.yes_bid !== undefined) {
-    // No ask ≈ 100 - yes_bid (plus some spread)
-    noPrice = 100 - market.yes_bid;
-  } else {
-    noPrice = 100 - yesPrice;
-  }
-  
   return {
     ticker: market.ticker,
     name: extractOutcomeName(market),
-    probability,
-    yes_price: yesPrice,
-    no_price: noPrice,
-    yes_bid: market.yes_bid ?? null,
-    yes_ask: market.yes_ask ?? null,
-    no_bid: market.no_bid ?? null,
-    no_ask: market.no_ask ?? null,
+    chance: market.quote.chance,
+    quote: market.quote,
     volume_24h: market.volume_24h ?? null,
     open_interest: market.open_interest ?? null,
     liquidity: market.liquidity ?? null,
-    is_illiquid: isMarketIlliquid(market),
   };
 }
 
@@ -669,8 +706,12 @@ export function groupMarketsByEvent(markets: Market[]): GroupedEvent[] {
   for (const [eventTicker, data] of eventMap) {
     const outcomes = data.markets.map(marketToOutcome);
     
-    // Sort outcomes by probability (highest first)
-    outcomes.sort((a, b) => b.probability - a.probability);
+    // Sort outcomes by chance (highest first), keep nulls last
+    outcomes.sort((a, b) => {
+      const aChance = a.chance ?? -1;
+      const bChance = b.chance ?? -1;
+      return bChance - aChance;
+    });
     
     // Calculate total volume
     const totalVolume = outcomes.reduce(

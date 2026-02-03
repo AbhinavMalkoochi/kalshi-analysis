@@ -5,6 +5,7 @@ import OrderbookCard from "@/components/market/orderbook";
 import MarketRules from "@/components/market/market-rules";
 import ChatPanel from "@/components/market/chat-panel";
 import EventMarkets from "@/components/market/event-markets";
+import MarketTicket from "@/components/market/market-ticket";
 import { notFound } from "next/navigation";
 import {
   getMarket,
@@ -88,6 +89,8 @@ export default async function MarketPage({
     candlesticks,
   };
 
+  const chance = market.quote.chance !== null ? `${market.quote.chance}%` : "—";
+
   return (
     <div className="min-h-screen bg-black text-foreground">
       <SiteHeader />
@@ -112,6 +115,9 @@ export default async function MarketPage({
               Viewing: {marketSubtitle}
             </p>
           )}
+          <div className="text-sm text-muted-foreground">
+            Chance <span className="font-mono text-emerald-300">{chance}</span>
+          </div>
           
           {/* Time info */}
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -134,7 +140,7 @@ export default async function MarketPage({
             <MarketAnalytics 
               marketTicker={ticker} 
               candlesticks={candlesticks}
-              currentPrice={market.yes_ask ?? market.yes_bid ?? market.last_price ?? undefined}
+              currentPrice={market.quote.mark_price ?? market.quote.last_trade_price ?? undefined}
             />
             
             {/* Volume display */}
@@ -151,6 +157,7 @@ export default async function MarketPage({
           
           {/* Right column - Event markets, chat */}
           <div className="space-y-6">
+            <MarketTicket market={market} />
             {eventMarkets.length > 1 && (
               <EventMarkets
                 eventTitle={market.event_title ?? mainTitle}

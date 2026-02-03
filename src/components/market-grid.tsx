@@ -5,14 +5,14 @@ import type { Market } from "@/lib/kalshi";
 
 // Format price in cents to display string
 function formatPrice(value?: number | null) {
-  if (value === undefined || value === null) return "--";
-  return `${value}¢`;
+  if (value === undefined || value === null) return "—";
+  return `${Math.round(value)}¢`;
 }
 
 // Format price as percentage (e.g., 50¢ = 50%)
 function formatPercent(value?: number | null) {
-  if (value === undefined || value === null) return "--";
-  return `${value}%`;
+  if (value === undefined || value === null) return "—";
+  return `${Math.round(value)}%`;
 }
 
 // Format volume with K/M suffixes
@@ -27,20 +27,10 @@ export default function MarketGrid({ markets }: { markets: Market[] }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {markets.map((market) => {
-        // Calculate yes/no prices based on available data
-        const yesPrice = market.yes_price ?? market.yes_bid ?? market.last_price ?? 0;
-        
-        // For NO price: use no_price if available, otherwise calculate from yes_bid
-        let noPrice: number;
-        if (market.no_price !== undefined && market.no_price !== null) {
-          noPrice = market.no_price;
-        } else if (market.no_bid !== undefined && market.no_bid !== null) {
-          noPrice = market.no_bid;
-        } else if (market.yes_bid !== undefined && market.yes_bid !== null) {
-          noPrice = 100 - market.yes_bid;
-        } else {
-          noPrice = 100 - yesPrice;
-        }
+        const { quote } = market;
+        const yesAsk = quote.yes_ask;
+        const noAsk = quote.no_ask;
+        const chance = quote.chance;
         
         return (
           <Link key={market.ticker} href={`/market/${market.ticker}`}>
@@ -73,25 +63,21 @@ export default function MarketGrid({ markets }: { markets: Market[] }) {
                 ) : null}
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Pricing row */}
+                {/* Chance + actionable prices */}
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col">
-                    <span className="text-xs text-muted-foreground">Yes</span>
-                    <span className="font-mono text-xl font-semibold text-emerald-300">
-                      {formatPercent(yesPrice)}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {formatPrice(yesPrice)}
+                    <span className="text-xs text-muted-foreground">Chance</span>
+                    <span className="font-mono text-2xl font-semibold text-emerald-300">
+                      {formatPercent(chance)}
                     </span>
                   </div>
-                  <div className="flex flex-col items-end">
-                    <span className="text-xs text-muted-foreground">No</span>
-                    <span className="font-mono text-xl font-semibold text-red-400">
-                      {formatPercent(noPrice)}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {formatPrice(noPrice)}
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <div className="rounded bg-emerald-600/90 px-3 py-1.5 text-xs font-semibold text-white">
+                      Yes {formatPrice(yesAsk)}
+                    </div>
+                    <div className="rounded bg-rose-600/90 px-3 py-1.5 text-xs font-semibold text-white">
+                      No {formatPrice(noAsk)}
+                    </div>
                   </div>
                 </div>
                 
@@ -104,7 +90,7 @@ export default function MarketGrid({ markets }: { markets: Market[] }) {
                   <div className="flex flex-col items-center">
                     <span>Bid/Ask</span>
                     <span className="font-mono text-foreground">
-                      {formatPrice(market.yes_bid)}/{formatPrice(market.yes_ask)}
+                      {formatPrice(quote.yes_bid)}/{formatPrice(quote.yes_ask)}
                     </span>
                   </div>
                   <div className="flex flex-col items-end">

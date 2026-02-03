@@ -3,8 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Market } from "@/lib/kalshi";
 
 function formatPrice(value?: number | null) {
-  if (value === undefined || value === null) return "--";
+  if (value === undefined || value === null) return "—";
   return `${Math.round(value)}¢`;
+}
+
+function formatChance(value?: number | null) {
+  if (value === undefined || value === null) return "—";
+  return `${Math.round(value)}%`;
 }
 
 type EventMarketsProps = {
@@ -16,11 +21,11 @@ type EventMarketsProps = {
 export default function EventMarkets({ markets, currentTicker }: EventMarketsProps) {
   if (markets.length === 0) return null;
   
-  // Sort by probability (yes_ask) descending
+  // Sort by chance descending
   const sortedMarkets = [...markets].sort((a, b) => {
-    const aPrice = a.yes_ask ?? a.yes_bid ?? a.last_price ?? 0;
-    const bPrice = b.yes_ask ?? b.yes_bid ?? b.last_price ?? 0;
-    return bPrice - aPrice;
+    const aChance = a.quote.chance ?? -1;
+    const bChance = b.quote.chance ?? -1;
+    return bChance - aChance;
   });
   
   return (
@@ -38,26 +43,11 @@ export default function EventMarkets({ markets, currentTicker }: EventMarketsPro
       </CardHeader>
       <CardContent className="space-y-1.5 pt-0">
         {sortedMarkets.map((market) => {
-          // Use yes_ask as probability/price (cost to buy YES)
-          const yesPrice = market.yes_ask ?? market.yes_bid ?? market.last_price ?? 0;
-          
-          // Use no_ask or calculate from yes_bid (consistent with kalshi.ts)
-          let noPrice: number;
-          if (market.no_ask !== null && market.no_ask !== undefined) {
-            noPrice = market.no_ask;
-          } else if (market.yes_bid !== null && market.yes_bid !== undefined) {
-            noPrice = 100 - market.yes_bid;
-          } else {
-            noPrice = 100 - yesPrice;
-          }
+          const yesAsk = market.quote.yes_ask;
+          const noAsk = market.quote.no_ask;
           
           const isCurrentMarket = market.ticker === currentTicker;
-          
-          // Check for low liquidity
-          const isIlliquid = !market.yes_bid || market.yes_bid === 0;
-          
-          // Display probability as yes_price (cost to buy YES = implied probability)
-          const displayProbability = Math.round(yesPrice);
+          const showWarning = market.quote.has_wide_spread;
           
           return (
             <div
@@ -78,37 +68,55 @@ export default function EventMarkets({ markets, currentTicker }: EventMarketsPro
                 </Link>
                 
                 <span className="font-mono text-lg font-semibold text-white">
-                  {displayProbability}%
+                  {formatChance(market.quote.chance)}
                 </span>
                 
-                {isIlliquid && (
+                {showWarning && (
                   <span className="shrink-0 rounded bg-yellow-500/20 px-1.5 py-0.5 text-[10px] text-yellow-400">
-                    Low Vol
+                    Wide spread
                   </span>
                 )}
               </div>
               
               {/* Yes/No buttons */}
               <div className="flex items-center gap-2 shrink-0">
-                <Link
-                  href={`/market/${market.ticker}`}
-                  className="flex items-center gap-1.5 rounded bg-emerald-600/90 px-3 py-1.5 transition hover:bg-emerald-600"
-                >
-                  <span className="text-xs font-medium text-emerald-100">Yes</span>
-                  <span className="font-mono text-sm font-semibold text-white">
-                    {formatPrice(yesPrice)}
+                {yesAsk === null ? (
+                  <span className="flex items-center gap-1.5 rounded bg-emerald-600/30 px-3 py-1.5 text-emerald-100/60">
+                    <span className="text-xs font-medium">Yes</span>
+                    <span className="font-mono text-sm font-semibold">
+                      {formatPrice(yesAsk)}
+                    </span>
                   </span>
-                </Link>
+                ) : (
+                  <Link
+                    href={`/market/${market.ticker}`}
+                    className="flex items-center gap-1.5 rounded bg-emerald-600/90 px-3 py-1.5 transition hover:bg-emerald-600"
+                  >
+                    <span className="text-xs font-medium text-emerald-100">Yes</span>
+                    <span className="font-mono text-sm font-semibold text-white">
+                      {formatPrice(yesAsk)}
+                    </span>
+                  </Link>
+                )}
                 
-                <Link
-                  href={`/market/${market.ticker}`}
-                  className="flex items-center gap-1.5 rounded bg-rose-600/90 px-3 py-1.5 transition hover:bg-rose-600"
-                >
-                  <span className="text-xs font-medium text-rose-100">No</span>
-                  <span className="font-mono text-sm font-semibold text-white">
-                    {formatPrice(noPrice)}
+                {noAsk === null ? (
+                  <span className="flex items-center gap-1.5 rounded bg-rose-600/30 px-3 py-1.5 text-rose-100/60">
+                    <span className="text-xs font-medium">No</span>
+                    <span className="font-mono text-sm font-semibold">
+                      {formatPrice(noAsk)}
+                    </span>
                   </span>
-                </Link>
+                ) : (
+                  <Link
+                    href={`/market/${market.ticker}`}
+                    className="flex items-center gap-1.5 rounded bg-rose-600/90 px-3 py-1.5 transition hover:bg-rose-600"
+                  >
+                    <span className="text-xs font-medium text-rose-100">No</span>
+                    <span className="font-mono text-sm font-semibold text-white">
+                      {formatPrice(noAsk)}
+                    </span>
+                  </Link>
+                )}
               </div>
             </div>
           );
