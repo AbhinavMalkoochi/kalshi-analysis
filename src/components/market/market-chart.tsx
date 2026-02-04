@@ -7,7 +7,10 @@ import {
   YAxis,
   Area,
   AreaChart,
+  ReferenceDot,
+  ReferenceLine,
 } from "recharts";
+import type { ChartAnnotation } from "./market-analysis";
 
 type ChartPoint = {
   ts: number;
@@ -34,9 +37,11 @@ type TimeRange = "6H" | "1D" | "1W" | "1M" | "ALL";
 export default function MarketChart({
   chartData,
   currentPrice,
+  annotations = [],
 }: {
   chartData: ChartPoint[];
   currentPrice?: number;
+  annotations?: ChartAnnotation[];
 }) {
   const data = chartData.map((item) => ({
     time: item.ts,
@@ -75,6 +80,21 @@ export default function MarketChart({
 
   const timeRanges: TimeRange[] = ["6H", "1D", "1W", "1M", "ALL"];
 
+  // Find price at annotation timestamp
+  const getAnnotationPrice = (timestamp: number): number | null => {
+    // Find closest data point
+    let closest = data[0];
+    let minDiff = Math.abs(data[0].time - timestamp);
+    for (const point of data) {
+      const diff = Math.abs(point.time - timestamp);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closest = point;
+      }
+    }
+    return closest?.price ?? null;
+  };
+
   return (
     <div className="rounded-lg border border-gray-700/80 bg-gray-900/90 p-4 shadow-lg">
       {/* Chart header */}
@@ -98,8 +118,8 @@ export default function MarketChart({
               key={range}
               type="button"
               className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${range === "ALL"
-                  ? "bg-gray-700 text-white"
-                  : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+                ? "bg-gray-700 text-white"
+                : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
                 }`}
             >
               {range}
@@ -108,7 +128,22 @@ export default function MarketChart({
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={240}>
+      {/* Annotations legend */}
+      {annotations.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          {annotations.map((annotation, idx) => (
+            <div
+              key={annotation.timestamp}
+              className="flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs"
+            >
+              <span className="h-2 w-2 rounded-full bg-amber-400" />
+              <span className="text-amber-300">{annotation.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <ResponsiveContainer width="100%" height={280}>
         <AreaChart data={data}>
           <defs>
             <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
@@ -155,8 +190,42 @@ export default function MarketChart({
             fill="url(#colorPrice)"
             dot={false}
           />
+
+          {/* Render annotation markers */}
+          {annotations.map((annotation) => {
+            const price = getAnnotationPrice(annotation.timestamp);
+            if (price === null) return null;
+
+            return (
+              <ReferenceDot
+                key={annotation.timestamp}
+                x={annotation.timestamp}
+                y={price}
+                r={6}
+                fill="#fbbf24"
+                stroke="#1f2937"
+                strokeWidth={2}
+              />
+            );
+          })}
         </AreaChart>
       </ResponsiveContainer>
+
+      {/* Annotation explanations */}
+      {annotations.length > 0 && (
+        <div className="mt-4 space-y-2 border-t border-gray-700/50 pt-4">
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">AI Insights</p>
+          {annotations.map((annotation) => (
+            <div key={annotation.timestamp} className="flex gap-2 text-sm">
+              <span className="shrink-0 h-2 w-2 mt-1.5 rounded-full bg-amber-400" />
+              <div>
+                <span className="font-medium text-amber-300">{annotation.label}:</span>{" "}
+                <span className="text-gray-300">{annotation.explanation}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

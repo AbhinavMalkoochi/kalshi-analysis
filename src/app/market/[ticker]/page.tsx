@@ -1,8 +1,7 @@
 import SiteHeader from "@/components/site-header";
-import MarketChart from "@/components/market/market-chart";
 import MarketRules from "@/components/market/market-rules";
-import ChatPanel from "@/components/market/chat-panel";
 import EventMarkets from "@/components/market/event-markets";
+import MarketAnalysis from "@/components/market/market-analysis";
 import { notFound } from "next/navigation";
 import {
   getMarketOrEvent,
@@ -142,35 +141,28 @@ function EventView({
         </div>
       </header>
 
-      {/* Main content - Two column layout */}
-      <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
-        {/* Left column: Chart + Options */}
-        <div className="space-y-6">
-          <MarketChart
-            chartData={chartData}
-            currentPrice={leadMarket?.quote.mark_price ?? leadMarket?.quote.last_trade_price ?? undefined}
+      {/* Main content */}
+      <MarketAnalysis
+        chartData={chartData}
+        currentPrice={leadMarket?.quote.mark_price ?? leadMarket?.quote.last_trade_price ?? undefined}
+        chatContext={chatContext}
+      />
+
+      {/* Options and Rules */}
+      <div className="mt-6 space-y-6">
+        <EventMarkets
+          eventTitle={event.title}
+          markets={event.markets}
+        />
+
+        {leadMarket && (leadMarket.rules_primary || leadMarket.rules_secondary) && (
+          <MarketRules
+            rulesPrimary={leadMarket.rules_primary ?? undefined}
+            rulesSecondary={leadMarket.rules_secondary ?? undefined}
+            resolution={leadMarket.resolution ?? undefined}
+            rulesUrl={seriesInfo?.contract_terms_url}
           />
-
-          <EventMarkets
-            eventTitle={event.title}
-            markets={event.markets}
-          />
-
-          {/* Rules below options on left */}
-          {leadMarket && (leadMarket.rules_primary || leadMarket.rules_secondary) && (
-            <MarketRules
-              rulesPrimary={leadMarket.rules_primary ?? undefined}
-              rulesSecondary={leadMarket.rules_secondary ?? undefined}
-              resolution={leadMarket.resolution ?? undefined}
-              rulesUrl={seriesInfo?.contract_terms_url}
-            />
-          )}
-        </div>
-
-        {/* Right column: Chat (prominent) */}
-        <div className="lg:sticky lg:top-6 lg:self-start">
-          <ChatPanel context={chatContext} />
-        </div>
+        )}
       </div>
     </>
   );
@@ -243,35 +235,29 @@ function MarketView({
         </div>
       </header>
 
-      {/* Main content - Two column layout */}
-      <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
-        {/* Left column: Chart + Options + Rules */}
-        <div className="space-y-6">
-          <MarketChart
-            chartData={chartData}
-            currentPrice={market.quote.mark_price ?? market.quote.last_trade_price ?? undefined}
+      {/* Main content */}
+      <MarketAnalysis
+        chartData={chartData}
+        currentPrice={market.quote.mark_price ?? market.quote.last_trade_price ?? undefined}
+        chatContext={chatContext}
+      />
+
+      {/* Options and Rules */}
+      <div className="mt-6 space-y-6">
+        {eventMarkets.length > 1 && (
+          <EventMarkets
+            eventTitle={market.event_title ?? mainTitle}
+            markets={eventMarkets}
+            currentTicker={market.ticker}
           />
+        )}
 
-          {eventMarkets.length > 1 && (
-            <EventMarkets
-              eventTitle={market.event_title ?? mainTitle}
-              markets={eventMarkets}
-              currentTicker={market.ticker}
-            />
-          )}
-
-          <MarketRules
-            rulesPrimary={market.rules_primary ?? undefined}
-            rulesSecondary={market.rules_secondary ?? undefined}
-            resolution={market.resolution ?? undefined}
-            rulesUrl={seriesInfo?.contract_terms_url}
-          />
-        </div>
-
-        {/* Right column: Chat (prominent, sticky) */}
-        <div className="lg:sticky lg:top-6 lg:self-start">
-          <ChatPanel context={chatContext} />
-        </div>
+        <MarketRules
+          rulesPrimary={market.rules_primary ?? undefined}
+          rulesSecondary={market.rules_secondary ?? undefined}
+          resolution={market.resolution ?? undefined}
+          rulesUrl={seriesInfo?.contract_terms_url}
+        />
       </div>
     </>
   );
