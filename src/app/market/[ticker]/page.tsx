@@ -1,6 +1,5 @@
 import SiteHeader from "@/components/site-header";
 import MarketAnalytics from "@/components/market/market-analytics";
-import OrderbookCard from "@/components/market/orderbook";
 import MarketRules from "@/components/market/market-rules";
 import ChatPanel from "@/components/market/chat-panel";
 import EventMarkets from "@/components/market/event-markets";
@@ -8,13 +7,12 @@ import { notFound } from "next/navigation";
 import {
   getMarketOrEvent,
   getMarketCandlesticks,
-  getOrderbook,
   getRecentCandlestickWindow,
   type Market,
   type Event,
 } from "@/lib/kalshi";
 
-function formatCloseTime(closeTime: string | null) {
+function formatCloseTime(closeTime: string | null): string | null {
   if (!closeTime) return null;
   const date = new Date(closeTime);
   const now = new Date();
@@ -36,7 +34,7 @@ function formatCloseTime(closeTime: string | null) {
   return `${days} days · ${formatted}`;
 }
 
-function formatVolume(volume: number) {
+function formatVolume(volume: number): string {
   if (volume >= 1000000) {
     return `$${(volume / 1000000).toFixed(2)}M`;
   } else if (volume >= 1000) {
@@ -45,25 +43,6 @@ function formatVolume(volume: number) {
   return `$${volume.toLocaleString()}`;
 }
 
-// Stats bar component - standardized for both market and event views
-function StatsBar({ volume, markets }: { volume: number; markets?: number }) {
-  return (
-    <section className="flex items-center gap-6 border-b border-border/20 pb-4 text-sm">
-      <div>
-        <span className="text-muted-foreground">Volume </span>
-        <span className="font-mono text-foreground">{formatVolume(volume)}</span>
-      </div>
-      {markets !== undefined && markets > 1 && (
-        <div>
-          <span className="text-muted-foreground">Options </span>
-          <span className="font-mono text-foreground">{markets}</span>
-        </div>
-      )}
-    </section>
-  );
-}
-
-// Build chat context from markets
 function buildChatContext(params: {
   ticker: string;
   title: string;
@@ -87,7 +66,6 @@ function buildChatContext(params: {
   };
 }
 
-// Render for an event (shows all markets in the event)
 async function EventView({
   event,
   candlesticks,
@@ -95,22 +73,18 @@ async function EventView({
   event: Event;
   candlesticks: Awaited<ReturnType<typeof getMarketCandlesticks>>;
 }) {
-  // Calculate total volume across all markets
   const totalVolume = event.markets.reduce(
     (sum, m) => sum + (m.volume ?? 0),
     0
   );
 
-  // Get the lead market (highest volume or first)
   const leadMarket = event.markets.reduce((best, m) =>
     (m.volume ?? 0) > (best.volume ?? 0) ? m : best,
     event.markets[0]
   );
 
-  // Calculate "forecast" - lead market's chance
   const forecast = leadMarket?.quote.chance ?? null;
 
-  // Build rules string from lead market
   const rules = [
     leadMarket?.rules_primary,
     leadMarket?.rules_secondary,
@@ -127,11 +101,14 @@ async function EventView({
 
   return (
     <>
-      {/* Header section */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-300 uppercase tracking-wider">
+      {/* Header */}
+      <header className="space-y-2">
+        <div className="flex items-center gap-3">
+          <span className="rounded bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-300 uppercase tracking-wider">
             {event.category ?? "Event"}
+          </span>
+          <span className="text-xs font-mono text-gray-500">
+            {event.event_ticker}
           </span>
         </div>
 
@@ -139,27 +116,27 @@ async function EventView({
           {event.title}
         </h1>
 
-        {forecast !== null && (
-          <div className="text-sm text-muted-foreground">
-            Forecast <span className="font-mono text-emerald-300">{Math.round(forecast)}%</span>
+        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
+          {forecast !== null && (
+            <div>
+              <span>Forecast </span>
+              <span className="font-mono font-semibold text-emerald-400">{Math.round(forecast)}%</span>
+            </div>
+          )}
+          <div>
+            <span className="font-mono text-gray-200">{formatVolume(totalVolume)}</span>
+            <span> vol</span>
           </div>
-        )}
-
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
           {leadMarket?.close_time && (
             <span>{formatCloseTime(leadMarket.close_time)}</span>
           )}
-          <span className="text-xs font-mono bg-black/40 px-2 py-0.5 rounded">
-            {event.event_ticker}
-          </span>
         </div>
-      </section>
+      </header>
 
-      <StatsBar volume={totalVolume} markets={event.markets.length} />
-
-      <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+      {/* Main content - Two column layout */}
+      <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
+        {/* Left column: Chart + Options */}
         <div className="space-y-6">
-          {/* Chart using lead market */}
           {leadMarket && (
             <MarketAnalytics
               marketTicker={leadMarket.ticker}
@@ -168,47 +145,38 @@ async function EventView({
             />
           )}
 
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{formatVolume(totalVolume)} vol</span>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          {/* All markets in this event */}
           <EventMarkets
             eventTitle={event.title}
             markets={event.markets}
           />
+
+          {/* Rules below options on left */}
+          {leadMarket && (leadMarket.rules_primary || leadMarket.rules_secondary) && (
+            <MarketRules
+              rulesPrimary={leadMarket.rules_primary ?? undefined}
+              rulesSecondary={leadMarket.rules_secondary ?? undefined}
+              resolution={leadMarket.resolution ?? undefined}
+            />
+          )}
+        </div>
+
+        {/* Right column: Chat (prominent) */}
+        <div className="lg:sticky lg:top-6 lg:self-start">
           <ChatPanel context={chatContext} />
         </div>
-      </section>
-
-      {/* Rules from lead market */}
-      {leadMarket && (leadMarket.rules_primary || leadMarket.rules_secondary) && (
-        <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-          <MarketRules
-            rulesPrimary={leadMarket.rules_primary ?? undefined}
-            rulesSecondary={leadMarket.rules_secondary ?? undefined}
-            resolution={leadMarket.resolution ?? undefined}
-          />
-          <OrderbookCard orderbook={{ yes: [], no: [] }} />
-        </section>
-      )}
+      </div>
     </>
   );
 }
 
-// Render for a single market (direct market ticker)
 async function MarketView({
   market,
   eventMarkets,
   candlesticks,
-  orderbook,
 }: {
   market: Market;
   eventMarkets: Market[];
   candlesticks: Awaited<ReturnType<typeof getMarketCandlesticks>>;
-  orderbook: Awaited<ReturnType<typeof getOrderbook>>;
 }) {
   const mainTitle = market.event_title && market.event_title !== "Combo"
     ? market.event_title
@@ -217,13 +185,11 @@ async function MarketView({
   const volume = market.volume ?? 0;
   const chance = market.quote.chance !== null ? `${market.quote.chance}%` : "—";
 
-  // Build rules string
   const rules = [
     market.rules_primary,
     market.rules_secondary,
   ].filter(Boolean).join("\n\n");
 
-  // Use event markets if available, otherwise just this market
   const marketsForContext = eventMarkets.length > 0 ? eventMarkets : [market];
 
   const chatContext = buildChatContext({
@@ -237,11 +203,14 @@ async function MarketView({
 
   return (
     <>
-      {/* Header section */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="rounded bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-300 uppercase tracking-wider">
+      {/* Header */}
+      <header className="space-y-2">
+        <div className="flex items-center gap-3">
+          <span className="rounded bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-300 uppercase tracking-wider">
             {market.category ?? "Market"}
+          </span>
+          <span className="text-xs font-mono text-gray-500">
+            {market.ticker}
           </span>
         </div>
 
@@ -249,23 +218,24 @@ async function MarketView({
           {mainTitle}
         </h1>
 
-        <div className="text-sm text-muted-foreground">
-          Chance <span className="font-mono text-emerald-300">{chance}</span>
-        </div>
-
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-400">
+          <div>
+            <span>Chance </span>
+            <span className="font-mono font-semibold text-emerald-400">{chance}</span>
+          </div>
+          <div>
+            <span className="font-mono text-gray-200">{formatVolume(volume)}</span>
+            <span> vol</span>
+          </div>
           {market.close_time && (
             <span>{formatCloseTime(market.close_time)}</span>
           )}
-          <span className="text-xs font-mono bg-black/40 px-2 py-0.5 rounded">
-            {market.ticker}
-          </span>
         </div>
-      </section>
+      </header>
 
-      <StatsBar volume={volume} markets={eventMarkets.length} />
-
-      <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">
+      {/* Main content - Two column layout */}
+      <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
+        {/* Left column: Chart + Options + Rules */}
         <div className="space-y-6">
           <MarketAnalytics
             marketTicker={market.ticker}
@@ -273,12 +243,6 @@ async function MarketView({
             currentPrice={market.quote.mark_price ?? market.quote.last_trade_price ?? undefined}
           />
 
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{formatVolume(volume)} vol</span>
-          </div>
-        </div>
-
-        <div className="space-y-6">
           {eventMarkets.length > 1 && (
             <EventMarkets
               eventTitle={market.event_title ?? mainTitle}
@@ -286,18 +250,19 @@ async function MarketView({
               currentTicker={market.ticker}
             />
           )}
+
+          <MarketRules
+            rulesPrimary={market.rules_primary ?? undefined}
+            rulesSecondary={market.rules_secondary ?? undefined}
+            resolution={market.resolution ?? undefined}
+          />
+        </div>
+
+        {/* Right column: Chat (prominent, sticky) */}
+        <div className="lg:sticky lg:top-6 lg:self-start">
           <ChatPanel context={chatContext} />
         </div>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <MarketRules
-          rulesPrimary={market.rules_primary ?? undefined}
-          rulesSecondary={market.rules_secondary ?? undefined}
-          resolution={market.resolution ?? undefined}
-        />
-        <OrderbookCard orderbook={orderbook} />
-      </section>
+      </div>
     </>
   );
 }
@@ -313,7 +278,6 @@ export default async function MarketPage({
   }
   const ticker = resolvedParams.ticker.toUpperCase();
 
-  // Try to get market or event
   const result = await getMarketOrEvent(ticker);
 
   if (!result) {
@@ -322,9 +286,7 @@ export default async function MarketPage({
 
   if (result.type === "market") {
     const market = result.market;
-    const orderbook = await getOrderbook(ticker);
 
-    // Fetch related markets from the same event
     const { getEventMarkets } = await import("@/lib/kalshi");
     const eventMarkets = market.event_ticker
       ? await getEventMarkets(market.event_ticker)
@@ -342,21 +304,19 @@ export default async function MarketPage({
       : [];
 
     return (
-      <div className="min-h-screen bg-black text-foreground">
+      <div className="min-h-screen bg-black text-gray-100">
         <SiteHeader />
         <main className="mx-auto w-full max-w-6xl space-y-6 px-6 py-8">
           <MarketView
             market={market}
             eventMarkets={eventMarkets}
             candlesticks={candlesticks}
-            orderbook={orderbook}
           />
         </main>
       </div>
     );
   }
 
-  // Event view
   const event = result.event;
   const leadMarket = event.markets[0];
 
@@ -372,7 +332,7 @@ export default async function MarketPage({
     : [];
 
   return (
-    <div className="min-h-screen bg-black text-foreground">
+    <div className="min-h-screen bg-black text-gray-100">
       <SiteHeader />
       <main className="mx-auto w-full max-w-6xl space-y-6 px-6 py-8">
         <EventView
