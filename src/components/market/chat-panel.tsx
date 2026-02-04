@@ -1,135 +1,166 @@
 "use client";
 
-import { useState } from "react";
-import { useAction } from "convex/react";
-import { api } from "../../../convex/_generated/api";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+import { useRef, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { DEFAULT_MODEL, DEFAULT_PROVIDER, MODELS, Provider } from "@/lib/models";
 import { useSettings } from "@/hooks/use-settings";
 import Link from "next/link";
 
-export default function ChatPanel({
-  marketTicker,
-  context,
-}: {
+type MarketContext = {
   marketTicker: string;
-  context: unknown;
-}) {
+  marketTitle?: string;
+  eventTitle?: string;
+  category?: string;
+  rules?: string;
+  markets?: Array<{
+    name: string;
+    chance: number | null;
+    yes_ask: number | null;
+    no_ask: number | null;
+  }>;
+};
+
+export default function ChatPanel({ context }: { context: MarketContext }) {
   const { isAuthenticated, settings } = useSettings();
-  const sendMessage = useAction(api.chat.sendMessage);
-  const provider =
-    (settings?.preferences.defaultProvider as Provider) ?? DEFAULT_PROVIDER;
-  const model = settings?.preferences.defaultModel ?? DEFAULT_MODEL;
-  const webSearch = settings?.preferences.webSearchEnabled ?? false;
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<
-    Array<{ role: "user" | "assistant"; content: string }>
-  >([]);
-  const [error, setError] = useState<string | null>(null);
-  const [isSending, setIsSending] = useState(false);
 
+  const apiKey = settings?.encryptedKeys?.openai;
 
-  async function handleSend() {
-    setError(null);
-    if (!input.trim()) return;
-    if (!isAuthenticated) {
-      setError("Sign in to chat with the market.");
-      return;
-    }
-
-    const apiKey = settings?.encryptedKeys?.[provider];
-    if (!apiKey) {
-      setError("No API key saved for this provider. Add it in Settings.");
-      return;
-    }
-
-    const userMessage = { role: "user" as const, content: input.trim() };
-    const nextMessages = [...messages, userMessage];
-    setMessages(nextMessages);
-    setInput("");
-    setIsSending(true);
-
-    try {
-      const response = await sendMessage({
-        marketTicker,
-        provider,
-        model,
+  const { messages, sendMessage, status, error } = useChat({
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      body: {
+        context: {
+          marketTicker: context.marketTicker,
+          marketTitle: context.marketTitle,
+          eventTitle: context.eventTitle,
+          category: context.category,
+          rules: context.rules,
+          markets: context.markets,
+        },
         apiKey,
-        webSearchEnabled: webSearch,
-        context,
-        messages: nextMessages,
-      });
+      },
+    }),
+  });
 
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: response.reply },
-      ]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send message.");
-    } finally {
-      setIsSending(false);
+  const isLoading = status === "submitted" || status === "streaming";
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Handle form submission
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (input.trim() && !isLoading) {
+      sendMessage({ text: input });
+      setInput("");
     }
   }
 
+  // Summarize button handler
+  function handleSummarize() {
+    const summaryPrompt = "Give me a brief summary of this market: what it's about, current odds, and key factors to consider.";
+    sendMessage({ text: summaryPrompt });
+  }
+
+  const hasApiKey = Boolean(apiKey || process.env.NEXT_PUBLIC_HAS_OPENAI_KEY);
+
   return (
     <Card className="border-border/60 bg-black/40">
-      <CardHeader className="flex flex-row items-start justify-between">
-        <div>
-          <CardTitle className="text-sm text-emerald-200">Market Chat</CardTitle>
-          <p className="text-xs text-muted-foreground">Ask about rules, odds, or sentiment.</p>
-        </div>
-        <Badge variant="outline" className="border-emerald-500/40 text-emerald-200">
-          {provider}
-        </Badge>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 bg-black/30 px-3 py-2">
-          <div className="space-y-0.5">
-            <p className="text-sm text-foreground">Provider</p>
-            <p className="text-xs text-muted-foreground">{provider}</p>
-          </div>
-          <div className="space-y-0.5">
-            <p className="text-sm text-foreground">Model</p>
-            <p className="text-xs text-muted-foreground">
-              {MODELS[provider].find((item) => item.value === model)?.label ?? model}
-            </p>
-          </div>
-          <Button asChild variant="ghost" size="sm" className="text-emerald-200 hover:text-emerald-100">
-            <Link href="/settings">Manage AI Settings</Link>
-          </Button>
-        </div>
-        <div className="space-y-3">
-          <div className="h-56 space-y-3 overflow-y-auto rounded-lg border border-border/60 bg-black/60 p-3 text-sm">
-            {messages.length === 0 ? (
-              <p className="text-muted-foreground">Ask about this market. The chat is pre-seeded with rules and price history.</p>
-            ) : null}
-            {messages.map((message, index) => (
-              <div key={`${message.role}-${index}`} className="space-y-1">
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                  {message.role === "user" ? "You" : "Terminal"}
-                </p>
-                <p className="text-foreground">{message.content}</p>
-              </div>
-            ))}
-          </div>
-          <Textarea
-            placeholder="Ask about drivers, trend, or what could move this market..."
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            className="min-h-[80px] bg-black/40"
-          />
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm text-emerald-200">Market Analysis</CardTitle>
           <Button
-            onClick={handleSend}
-            disabled={isSending}
-            className="w-full bg-emerald-400 text-black hover:bg-emerald-300"
+            variant="ghost"
+            size="sm"
+            onClick={handleSummarize}
+            disabled={isLoading}
+            className="text-xs text-emerald-300 hover:text-emerald-200 hover:bg-emerald-500/10"
           >
-            {isSending ? "Thinking..." : "Send Message"}
+            ✨ Summarize
           </Button>
-          {error ? <p className="text-xs text-rose-300">{error}</p> : null}
         </div>
+        <p className="text-xs text-muted-foreground">Ask about odds, rules, or market dynamics.</p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {/* Messages area */}
+        <div className="h-64 space-y-3 overflow-y-auto rounded-lg border border-border/60 bg-black/60 p-3 text-sm">
+          {messages.length === 0 ? (
+            <div className="space-y-2 text-muted-foreground">
+              <p>Ask anything about this market. The AI has context about:</p>
+              <ul className="list-disc list-inside text-xs space-y-1">
+                <li>Current prices and odds</li>
+                <li>Market rules and settlement criteria</li>
+                <li>All available options</li>
+              </ul>
+              <p className="text-xs">Click &quot;Summarize&quot; for a quick overview.</p>
+            </div>
+          ) : null}
+
+          {messages.map((message) => (
+            <div key={message.id} className="space-y-1">
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                {message.role === "user" ? "You" : "AI"}
+              </p>
+              <div className="text-foreground whitespace-pre-wrap">
+                {message.parts?.map((part, i) => {
+                  if (part.type === "text") {
+                    return <span key={i}>{part.text}</span>;
+                  }
+                  return null;
+                })}
+              </div>
+            </div>
+          ))}
+
+          {isLoading && (
+            <div className="flex items-center gap-2 text-emerald-300">
+              <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+              <span className="text-xs">Thinking...</span>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Error display */}
+        {error && (
+          <p className="text-xs text-rose-300">
+            {error.message || "An error occurred. Please try again."}
+          </p>
+        )}
+
+        {/* Auth check */}
+        {!isAuthenticated && !hasApiKey ? (
+          <div className="rounded-lg border border-border/60 bg-black/30 p-3 text-center text-sm">
+            <p className="text-muted-foreground mb-2">Sign in and add your OpenAI API key to chat.</p>
+            <Button asChild variant="ghost" size="sm" className="text-emerald-200">
+              <Link href="/settings">Go to Settings</Link>
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex gap-2">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask about this market..."
+              className="flex-1 rounded-lg border border-border/60 bg-black/40 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-emerald-500/50 focus:outline-none"
+              disabled={isLoading}
+            />
+            <Button
+              type="submit"
+              disabled={isLoading || !input.trim()}
+              className="bg-emerald-400 text-black hover:bg-emerald-300 px-4"
+            >
+              Send
+            </Button>
+          </form>
+        )}
       </CardContent>
     </Card>
   );

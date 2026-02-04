@@ -443,6 +443,74 @@ export async function getMarket(ticker: string) {
   return normalizeMarket(data.market, { eventTitle, seriesTitle });
 }
 
+// Result type for getMarketOrEvent
+export type MarketOrEventResult = 
+  | { type: "market"; market: Market; event: null }
+  | { type: "event"; market: null; event: Event };
+
+/**
+ * Get market OR event data by ticker.
+ * Tries /markets endpoint first, falls back to /events if 404.
+ * This handles Kalshi's hierarchy where users may paste event URLs.
+ */
+export async function getMarketOrEvent(ticker: string): Promise<MarketOrEventResult | null> {
+  // First, try to get as a market
+  try {
+    const data = await kalshiFetch<{ market: KalshiMarketRaw }>(
+      `/markets/${ticker}`,
+    );
+    const [eventTitle, seriesTitle] = await Promise.all([
+      data.market.event_ticker ? getEventTitle(data.market.event_ticker) : undefined,
+      data.market.series_ticker ? getSeriesTitle(data.market.series_ticker) : undefined,
+    ]);
+    const market = normalizeMarket(data.market, { eventTitle, seriesTitle });
+    return { type: "market", market, event: null };
+  } catch (marketError) {
+    // If market fetch failed, try as an event
+    const isNotFound = marketError instanceof Error && marketError.message.includes("404");
+    if (!isNotFound) {
+      // Some other error, re-throw
+      throw marketError;
+    }
+  }
+  
+  // Try to get as an event
+  try {
+    const data = await kalshiFetch<{ event: KalshiEventRaw & { markets?: KalshiMarketRaw[] } }>(
+      `/events/${ticker}`,
+      { with_nested_markets: "true" },
+    );
+    
+    const eventRaw = data.event;
+    const seriesTitle = eventRaw.series_ticker
+      ? await getSeriesTitle(eventRaw.series_ticker)
+      : undefined;
+    
+    const markets = (eventRaw.markets ?? []).map((market) =>
+      normalizeMarket(market, {
+        eventTitle: eventRaw.title,
+        seriesTitle,
+      }),
+    );
+    
+    const event: Event = {
+      event_ticker: eventRaw.event_ticker,
+      title: eventRaw.title,
+      sub_title: eventRaw.sub_title ?? null,
+      category: eventRaw.category ?? null,
+      series_ticker: eventRaw.series_ticker ?? null,
+      mutually_exclusive: eventRaw.mutually_exclusive ?? null,
+      strike_date: eventRaw.strike_date ?? null,
+      markets,
+    };
+    
+    return { type: "event", market: null, event };
+  } catch {
+    // Both failed
+    return null;
+  }
+}
+
 // Event with nested markets
 export type Event = {
   event_ticker: string;
