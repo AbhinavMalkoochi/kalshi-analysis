@@ -152,11 +152,24 @@ Your response style:
       const maxPrice = Math.max(...prices);
       const latestPrice = context.chartData[context.chartData.length - 1]?.price;
       const firstPrice = context.chartData[0]?.price;
-      systemPrompt += `\n**Price History Summary:**\n`;
-      systemPrompt += `- Current: ${latestPrice}¢\n`;
-      systemPrompt += `- Range: ${minPrice}¢ - ${maxPrice}¢\n`;
-      systemPrompt += `- Change: ${latestPrice && firstPrice ? (latestPrice - firstPrice > 0 ? "+" : "") + (latestPrice - firstPrice) : 0}¢\n`;
-      systemPrompt += `- Data points: ${context.chartData.length}\n`;
+      
+      systemPrompt += `\n**Price History:**\n`;
+      systemPrompt += `- Current: ${latestPrice}¢ | Range: ${minPrice}¢ - ${maxPrice}¢ | Change: ${latestPrice && firstPrice ? (latestPrice - firstPrice > 0 ? "+" : "") + (latestPrice - firstPrice) : 0}¢\n`;
+      
+      // Include sampled data points so AI can identify specific movements
+      // Sample to ~20 points to avoid context overflow
+      const sampleRate = Math.max(1, Math.floor(context.chartData.length / 20));
+      const sampledData = context.chartData.filter((_, i) => i % sampleRate === 0 || i === context.chartData!.length - 1);
+      
+      systemPrompt += `\n**Chart Data (${sampledData.length} points, timestamps in Unix seconds):**\n`;
+      systemPrompt += `\`\`\`\n`;
+      for (const point of sampledData) {
+        const date = new Date(point.ts * 1000);
+        const dateStr = date.toISOString().slice(0, 16).replace('T', ' ');
+        systemPrompt += `${point.ts} (${dateStr}): ${point.price}¢\n`;
+      }
+      systemPrompt += `\`\`\`\n`;
+      systemPrompt += `\nWhen annotating, use the exact Unix timestamp from the data above.\n`;
     }
     
     if (context.rules) {
