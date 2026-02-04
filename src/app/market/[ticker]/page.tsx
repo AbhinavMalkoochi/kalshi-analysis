@@ -54,6 +54,7 @@ function buildChatContext(params: {
   category?: string;
   rules?: string;
   markets: Market[];
+  chartData?: ChartPoint[];
 }) {
   return {
     marketTicker: params.ticker,
@@ -61,6 +62,7 @@ function buildChatContext(params: {
     eventTitle: params.eventTitle,
     category: params.category,
     rules: params.rules,
+    chartData: params.chartData,
     markets: params.markets.map((m) => ({
       name: m.yes_sub_title || m.display_title,
       chance: m.quote.chance,
@@ -103,6 +105,7 @@ function EventView({
     category: event.category ?? undefined,
     rules,
     markets: event.markets,
+    chartData,
   });
 
   return (
@@ -205,6 +208,7 @@ function MarketView({
     category: market.category ?? undefined,
     rules,
     markets: marketsForContext,
+    chartData,
   });
 
   return (
