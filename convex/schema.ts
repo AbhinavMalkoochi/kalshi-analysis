@@ -13,12 +13,4 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_user", ["userId"]),
-  analysisReports: defineTable({
-    userId: v.string(),
-    marketTicker: v.string(),
-    provider: v.string(),
-    model: v.string(),
-    report: v.any(),
-    createdAt: v.number(),
-  }).index("by_user", ["userId"]),
 });

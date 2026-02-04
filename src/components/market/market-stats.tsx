@@ -30,29 +30,29 @@ export default function MarketStats({ market }: { market: Market }) {
   const yesBid = quote.yes_bid;
   const noBid = quote.no_bid;
   const spread = quote.spread ?? null;
-  
+
   return (
     <Card className="border-border/60 bg-black/40">
       <CardContent className="py-6">
         <div className="grid gap-6 sm:grid-cols-4">
-          <Stat 
-            label="Yes Price" 
+          <Stat
+            label="Yes Price"
             value={formatPrice(yesAsk)}
             subValue={`Buy ${formatPrice(yesAsk)} · Sell ${formatPrice(yesBid)}`}
           />
-          <Stat 
-            label="No Price" 
+          <Stat
+            label="No Price"
             value={formatPrice(noAsk)}
             subValue={`Buy ${formatPrice(noAsk)} · Sell ${formatPrice(noBid)}`}
           />
           <Stat label="24h Volume" value={formatVolume(market.volume)} />
           <Stat label="Open Interest" value={formatVolume(market.open_interest)} />
         </div>
-        
+
         {/* Liquidity warning */}
         {quote.has_wide_spread && (
           <div className="mt-4 rounded bg-yellow-500/10 px-3 py-2 text-xs text-yellow-400">
-            ⚠️ Wide spread{spread !== null ? ` (${Math.round(spread)}¢)` : ""} — consider limit orders
+            Wide spread{spread !== null ? ` (${Math.round(spread)}¢)` : ""} — consider limit orders
           </div>
         )}
       </CardContent>
