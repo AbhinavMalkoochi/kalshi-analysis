@@ -23,7 +23,14 @@ type MarketContext = {
 export default function ChatPanel({ context }: { context: MarketContext }) {
   const { isAuthenticated, settings } = useSettings();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  // Set mounted after first render to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const apiKey = settings?.encryptedKeys?.openai;
 
@@ -46,8 +53,11 @@ export default function ChatPanel({ context }: { context: MarketContext }) {
 
   const isLoading = status === "submitted" || status === "streaming";
 
+  // Scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesEndRef.current && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
   }, [messages]);
 
   function handleSubmit(e: React.FormEvent) {
@@ -65,6 +75,9 @@ export default function ChatPanel({ context }: { context: MarketContext }) {
 
   const hasApiKey = Boolean(apiKey || process.env.NEXT_PUBLIC_HAS_OPENAI_KEY);
 
+  // Show auth status only after mount to avoid hydration mismatch
+  const showAuthPrompt = mounted && !isAuthenticated && !hasApiKey;
+
   return (
     <div className="rounded-lg border border-gray-700/80 bg-gray-900/90 shadow-lg ring-1 ring-emerald-500/20">
       {/* Prominent header */}
@@ -79,7 +92,7 @@ export default function ChatPanel({ context }: { context: MarketContext }) {
         <button
           type="button"
           onClick={handleSummarize}
-          disabled={isLoading}
+          disabled={isLoading || showAuthPrompt}
           className="rounded-md bg-emerald-500/20 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/30 disabled:opacity-50 transition-colors"
         >
           ✨ Summarize
@@ -87,7 +100,10 @@ export default function ChatPanel({ context }: { context: MarketContext }) {
       </div>
 
       {/* Messages area - taller for prominence */}
-      <div className="h-80 space-y-3 overflow-y-auto p-4 text-sm">
+      <div
+        ref={scrollContainerRef}
+        className="h-96 space-y-3 overflow-y-auto p-4 text-sm"
+      >
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center text-gray-400">
             <svg className="mb-3 h-10 w-10 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -111,7 +127,7 @@ export default function ChatPanel({ context }: { context: MarketContext }) {
               {message.role === "user" ? "You" : "AI"}
             </p>
             <div className={`rounded-lg px-3 py-2 ${message.role === "user" ? "bg-gray-800" : "bg-gray-800/50"}`}>
-              <div className="text-gray-200 whitespace-pre-wrap">
+              <div className="text-gray-200 whitespace-pre-wrap leading-relaxed">
                 {message.parts?.map((part, i) => {
                   if (part.type === "text") {
                     return <span key={i}>{part.text}</span>;
@@ -142,9 +158,9 @@ export default function ChatPanel({ context }: { context: MarketContext }) {
         </div>
       )}
 
-      {/* Input area */}
+      {/* Input area - always render form to avoid hydration mismatch */}
       <div className="border-t border-gray-700/50 p-4">
-        {!isAuthenticated && !hasApiKey ? (
+        {showAuthPrompt ? (
           <div className="text-center text-sm">
             <p className="mb-2 text-gray-400">Add your OpenAI API key to chat</p>
             <Link href="/settings" className="text-emerald-400 hover:text-emerald-300">

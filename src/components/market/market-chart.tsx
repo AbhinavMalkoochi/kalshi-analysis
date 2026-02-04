@@ -1,6 +1,5 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
 import {
   ResponsiveContainer,
   Tooltip,
@@ -10,12 +9,9 @@ import {
   AreaChart,
 } from "recharts";
 
-type Candlestick = {
+type ChartPoint = {
   ts: number;
-  close: number | null;
-  open?: number | null;
-  high?: number | null;
-  low?: number | null;
+  price: number;
 };
 
 function formatTime(value: number): string {
@@ -36,24 +32,16 @@ function formatTimeTooltip(value: number): string {
 type TimeRange = "6H" | "1D" | "1W" | "1M" | "ALL";
 
 export default function MarketChart({
-  candlesticks,
+  chartData,
   currentPrice,
 }: {
-  candlesticks: Candlestick[];
+  chartData: ChartPoint[];
   currentPrice?: number;
 }) {
-  const mounted = useSyncExternalStore(
-    () => () => { },
-    () => true,
-    () => false
-  );
-
-  const data = candlesticks
-    .filter((item) => item.close !== null)
-    .map((item) => ({
-      time: item.ts,
-      price: item.close,
-    }));
+  const data = chartData.map((item) => ({
+    time: item.ts,
+    price: item.price,
+  }));
 
   if (data.length === 0) {
     return (
@@ -75,20 +63,14 @@ export default function MarketChart({
     );
   }
 
-  if (!mounted) {
-    return (
-      <div className="h-80 w-full rounded-lg border border-gray-700/80 bg-gray-900/90 animate-pulse" />
-    );
-  }
-
-  const prices = data.map(d => d.price as number);
+  const prices = data.map(d => d.price);
   const minPrice = Math.max(0, Math.min(...prices) - 5);
   const maxPrice = Math.min(100, Math.max(...prices) + 5);
 
-  const latestPrice = data.length > 0 ? data[data.length - 1].price : currentPrice;
-  const firstPrice = data.length > 0 ? data[0].price : null;
-  const priceChange = firstPrice && latestPrice ? (latestPrice as number) - (firstPrice as number) : 0;
-  const priceChangePercent = firstPrice ? ((priceChange / (firstPrice as number)) * 100).toFixed(1) : "0";
+  const latestPrice = data[data.length - 1].price;
+  const firstPrice = data[0].price;
+  const priceChange = latestPrice - firstPrice;
+  const priceChangePercent = firstPrice > 0 ? ((priceChange / firstPrice) * 100).toFixed(1) : "0";
   const isPositive = priceChange >= 0;
 
   const timeRanges: TimeRange[] = ["6H", "1D", "1W", "1M", "ALL"];

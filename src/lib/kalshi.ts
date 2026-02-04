@@ -674,6 +674,117 @@ export function getRecentCandlestickWindow(days = 30) {
 }
 
 // ============================================================================
+// TRADES API - More reliable for chart data than candlesticks
+// ============================================================================
+
+export type Trade = {
+  trade_id: string;
+  ticker: string;
+  yes_price: number;
+  no_price: number;
+  count: number;
+  created_time: string;
+  taker_side: string;
+};
+
+export async function getTrades(params: {
+  ticker: string;
+  limit?: number;
+  minTs?: number;
+  maxTs?: number;
+}): Promise<Trade[]> {
+  const queryParams: Record<string, string> = {
+    ticker: params.ticker,
+    limit: String(params.limit ?? 1000),
+  };
+  if (params.minTs) queryParams.min_ts = String(params.minTs);
+  if (params.maxTs) queryParams.max_ts = String(params.maxTs);
+
+  const data = await kalshiFetch<{ trades: Trade[]; cursor: string }>(
+    "/markets/trades",
+    queryParams,
+  );
+  return data.trades ?? [];
+}
+
+// Convert trades to chart data points
+export type ChartPoint = {
+  ts: number;
+  price: number;
+};
+
+export function tradesToChartData(trades: Trade[]): ChartPoint[] {
+  if (!trades.length) return [];
+  
+  // Sort by time ascending
+  const sorted = [...trades].sort((a, b) => 
+    new Date(a.created_time).getTime() - new Date(b.created_time).getTime()
+  );
+  
+  // Group by time bucket (hourly) and take last price
+  const buckets = new Map<number, number>();
+  for (const trade of sorted) {
+    const ts = Math.floor(new Date(trade.created_time).getTime() / 1000);
+    const bucketTs = Math.floor(ts / 3600) * 3600; // Round to hour
+    buckets.set(bucketTs, trade.yes_price);
+  }
+  
+  return Array.from(buckets.entries())
+    .map(([ts, price]) => ({ ts, price }))
+    .sort((a, b) => a.ts - b.ts);
+}
+
+// ============================================================================
+// SERIES API - For contract terms URL and metadata
+// ============================================================================
+
+export type SeriesInfo = {
+  ticker: string;
+  title: string;
+  category?: string;
+  contract_url?: string;
+  contract_terms_url?: string;
+  fee_type?: string;
+  settlement_sources?: Array<{ name: string; url: string }>;
+};
+
+export async function getSeriesInfo(seriesTicker: string): Promise<SeriesInfo | null> {
+  try {
+    const data = await kalshiFetch<{ series: SeriesInfo }>(`/series/${seriesTicker}`);
+    return data.series;
+  } catch {
+    return null;
+  }
+}
+
+// Derive series ticker from event ticker (KXSPACEXCOUNT-26FEB -> KXSPACEXCOUNT)
+export function deriveSeriesTicker(eventTicker: string): string {
+  // Pattern: SERIESNAME-DATEPART (e.g., KXSPACEXCOUNT-26FEB)
+  const match = eventTicker.match(/^([A-Z0-9]+)-\d/);
+  if (match) return match[1];
+  
+  // Fallback: just strip the last part after last hyphen
+  const parts = eventTicker.split("-");
+  if (parts.length > 1) {
+    return parts.slice(0, -1).join("-");
+  }
+  return eventTicker;
+}
+
+// Get time window for trades based on filter
+export function getTradesTimeWindow(filter: "6H" | "1D" | "1W" | "1M" | "ALL"): { minTs?: number; maxTs?: number } {
+  const now = Math.floor(Date.now() / 1000);
+  switch (filter) {
+    case "6H": return { minTs: now - 6 * 60 * 60 };
+    case "1D": return { minTs: now - 24 * 60 * 60 };
+    case "1W": return { minTs: now - 7 * 24 * 60 * 60 };
+    case "1M": return { minTs: now - 30 * 24 * 60 * 60 };
+    case "ALL": return {};
+    default: return {};
+  }
+}
+
+// ============================================================================
 // EVENT GROUPING - Groups individual markets by their event_ticker
 // ============================================================================
 

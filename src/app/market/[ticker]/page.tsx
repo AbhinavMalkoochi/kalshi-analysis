@@ -1,15 +1,19 @@
 import SiteHeader from "@/components/site-header";
-import MarketAnalytics from "@/components/market/market-analytics";
+import MarketChart from "@/components/market/market-chart";
 import MarketRules from "@/components/market/market-rules";
 import ChatPanel from "@/components/market/chat-panel";
 import EventMarkets from "@/components/market/event-markets";
 import { notFound } from "next/navigation";
 import {
   getMarketOrEvent,
-  getMarketCandlesticks,
-  getRecentCandlestickWindow,
+  getTrades,
+  tradesToChartData,
+  getSeriesInfo,
+  deriveSeriesTicker,
   type Market,
   type Event,
+  type ChartPoint,
+  type SeriesInfo,
 } from "@/lib/kalshi";
 
 function formatCloseTime(closeTime: string | null): string | null {
@@ -66,12 +70,14 @@ function buildChatContext(params: {
   };
 }
 
-async function EventView({
+function EventView({
   event,
-  candlesticks,
+  chartData,
+  seriesInfo,
 }: {
   event: Event;
-  candlesticks: Awaited<ReturnType<typeof getMarketCandlesticks>>;
+  chartData: ChartPoint[];
+  seriesInfo: SeriesInfo | null;
 }) {
   const totalVolume = event.markets.reduce(
     (sum, m) => sum + (m.volume ?? 0),
@@ -137,13 +143,10 @@ async function EventView({
       <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
         {/* Left column: Chart + Options */}
         <div className="space-y-6">
-          {leadMarket && (
-            <MarketAnalytics
-              marketTicker={leadMarket.ticker}
-              candlesticks={candlesticks}
-              currentPrice={leadMarket.quote.mark_price ?? leadMarket.quote.last_trade_price ?? undefined}
-            />
-          )}
+          <MarketChart
+            chartData={chartData}
+            currentPrice={leadMarket?.quote.mark_price ?? leadMarket?.quote.last_trade_price ?? undefined}
+          />
 
           <EventMarkets
             eventTitle={event.title}
@@ -156,6 +159,7 @@ async function EventView({
               rulesPrimary={leadMarket.rules_primary ?? undefined}
               rulesSecondary={leadMarket.rules_secondary ?? undefined}
               resolution={leadMarket.resolution ?? undefined}
+              rulesUrl={seriesInfo?.contract_terms_url}
             />
           )}
         </div>
@@ -169,14 +173,16 @@ async function EventView({
   );
 }
 
-async function MarketView({
+function MarketView({
   market,
   eventMarkets,
-  candlesticks,
+  chartData,
+  seriesInfo,
 }: {
   market: Market;
   eventMarkets: Market[];
-  candlesticks: Awaited<ReturnType<typeof getMarketCandlesticks>>;
+  chartData: ChartPoint[];
+  seriesInfo: SeriesInfo | null;
 }) {
   const mainTitle = market.event_title && market.event_title !== "Combo"
     ? market.event_title
@@ -237,9 +243,8 @@ async function MarketView({
       <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
         {/* Left column: Chart + Options + Rules */}
         <div className="space-y-6">
-          <MarketAnalytics
-            marketTicker={market.ticker}
-            candlesticks={candlesticks}
+          <MarketChart
+            chartData={chartData}
             currentPrice={market.quote.mark_price ?? market.quote.last_trade_price ?? undefined}
           />
 
@@ -255,6 +260,7 @@ async function MarketView({
             rulesPrimary={market.rules_primary ?? undefined}
             rulesSecondary={market.rules_secondary ?? undefined}
             resolution={market.resolution ?? undefined}
+            rulesUrl={seriesInfo?.contract_terms_url}
           />
         </div>
 
@@ -292,16 +298,15 @@ export default async function MarketPage({
       ? await getEventMarkets(market.event_ticker)
       : [];
 
-    const { start, end } = getRecentCandlestickWindow(30);
-    const candlesticks = market.series_ticker
-      ? await getMarketCandlesticks({
-        seriesTicker: market.series_ticker,
-        ticker,
-        startTs: start,
-        endTs: end,
-        periodInterval: 60,
-      })
-      : [];
+    // Fetch trades for chart
+    const trades = await getTrades({ ticker: market.ticker, limit: 1000 });
+    const chartData = tradesToChartData(trades);
+
+    // Fetch series info for rules URL
+    const seriesTicker = market.event_ticker
+      ? deriveSeriesTicker(market.event_ticker)
+      : null;
+    const seriesInfo = seriesTicker ? await getSeriesInfo(seriesTicker) : null;
 
     return (
       <div className="min-h-screen bg-black text-gray-100">
@@ -310,7 +315,8 @@ export default async function MarketPage({
           <MarketView
             market={market}
             eventMarkets={eventMarkets}
-            candlesticks={candlesticks}
+            chartData={chartData}
+            seriesInfo={seriesInfo}
           />
         </main>
       </div>
@@ -320,16 +326,15 @@ export default async function MarketPage({
   const event = result.event;
   const leadMarket = event.markets[0];
 
-  const { start, end } = getRecentCandlestickWindow(30);
-  const candlesticks = leadMarket?.series_ticker
-    ? await getMarketCandlesticks({
-      seriesTicker: leadMarket.series_ticker,
-      ticker: leadMarket.ticker,
-      startTs: start,
-      endTs: end,
-      periodInterval: 60,
-    })
+  // Fetch trades for the lead market
+  const trades = leadMarket
+    ? await getTrades({ ticker: leadMarket.ticker, limit: 1000 })
     : [];
+  const chartData = tradesToChartData(trades);
+
+  // Fetch series info for rules URL
+  const seriesTicker = deriveSeriesTicker(event.event_ticker);
+  const seriesInfo = await getSeriesInfo(seriesTicker);
 
   return (
     <div className="min-h-screen bg-black text-gray-100">
@@ -337,7 +342,8 @@ export default async function MarketPage({
       <main className="mx-auto w-full max-w-6xl space-y-6 px-6 py-8">
         <EventView
           event={event}
-          candlesticks={candlesticks}
+          chartData={chartData}
+          seriesInfo={seriesInfo}
         />
       </main>
     </div>
